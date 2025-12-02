@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Search, Plus, Trash2, Save } from 'lucide-react';
 import { useTaskModal } from '../contexts/TaskModalContext';
 import { useTaskContext } from '../contexts/TaskContext';
-import { incidents, volunteers } from '../mockData';
+import { useIncidentContext } from '../contexts/IncidentContext';
+import { volunteers } from '../mockData';
 import { TaskStatus, TaskType } from '../types';
 
 declare global {
@@ -13,8 +14,9 @@ declare global {
 }
 
 const CreateTaskForm: React.FC = () => {
-  const { isOpen, closeTaskForm } = useTaskModal();
-  const { addTask } = useTaskContext();
+  const { isOpen, closeTaskForm, taskToEdit } = useTaskModal();
+  const { addTask, updateTask } = useTaskContext();
+  const { incidents } = useIncidentContext();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
@@ -23,7 +25,7 @@ const CreateTaskForm: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
-  const [incidentId, setIncidentId] = useState(incidents[0]?.id || '');
+  const [incidentId, setIncidentId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState<any>(null);
@@ -31,23 +33,61 @@ const CreateTaskForm: React.FC = () => {
   const [location, setLocation] = useState({ lat: -7.2278, lng: 107.9087 }); // Default to Garut
   const [locationName, setLocationName] = useState('');
   const [taskType, setTaskType] = useState<TaskType>(TaskType.LOGISTICS);
+  const [status, setStatus] = useState<TaskStatus>(TaskStatus.OPEN);
   
   // Resource State
-  const [resources, setResources] = useState<{ id: number; item: string; quantity: number }[]>([
-    { id: 1, item: '', quantity: 1 }
+  const [resources, setResources] = useState<{ id: number; item: string; quantity: number; unit: string }[]>([
+    { id: 1, item: '', quantity: 1, unit: 'Buah' }
   ]);
 
-  // Reset form when closed
+  const unitOptions = ['Buah', 'Unit', 'Paket', 'Kg', 'Liter', 'Dus', 'Lembar', 'Set', 'Orang', 'Roll'];
+
+  // Load data for editing or set defaults
   useEffect(() => {
-    if (!isOpen) {
-        setTitle('');
-        setDescription('');
-        setPriority('Medium');
-        setResources([{ id: 1, item: '', quantity: 1 }]);
-        setAssigneeSearch('');
-        setSelectedAssignee(null);
+    if (isOpen) {
+        if (taskToEdit) {
+            // Populate form for editing
+            setTitle(taskToEdit.title);
+            setDescription(taskToEdit.description || '');
+            setPriority(taskToEdit.priority);
+            setIncidentId(taskToEdit.incidentId || (incidents[0]?.id || ''));
+            // Parse custom date string back to something input friendly if possible, or just reset for demo simplicity
+            // In a real app, use proper date objects. Here we might clear it or keep raw string if input allows.
+            // For now, let's just keep the input empty if it's a relative string like "Besok"
+            setDueDate(''); 
+            setTaskType(taskToEdit.type);
+            setStatus(taskToEdit.status);
+            setAssigneeSearch(taskToEdit.assignee);
+            // Mock finding the volunteer object
+            const assigneeVol = volunteers.find(v => v.name === taskToEdit.assignee);
+            setSelectedAssignee(assigneeVol || { name: taskToEdit.assignee, avatar: taskToEdit.assigneeAvatar });
+            
+            if (taskToEdit.coordinates) {
+                setLocation(taskToEdit.coordinates);
+                setLocationName(`${taskToEdit.coordinates.lat.toFixed(5)}, ${taskToEdit.coordinates.lng.toFixed(5)}`);
+            }
+
+            if (taskToEdit.resources && taskToEdit.resources.length > 0) {
+                setResources(taskToEdit.resources);
+            } else {
+                setResources([{ id: 1, item: '', quantity: 1, unit: 'Buah' }]);
+            }
+
+        } else {
+            // Reset for new task
+            setTitle('');
+            setDescription('');
+            setPriority('Medium');
+            setResources([{ id: 1, item: '', quantity: 1, unit: 'Buah' }]);
+            setAssigneeSearch('');
+            setSelectedAssignee(null);
+            setStatus(TaskStatus.OPEN);
+            if (incidents.length > 0) {
+                setIncidentId(incidents[0].id);
+            }
+        }
     }
-  }, [isOpen]);
+  }, [isOpen, taskToEdit, incidents]);
 
   // Helper to get color based on priority
   const getPriorityColor = (p: string) => {
@@ -158,35 +198,41 @@ const CreateTaskForm: React.FC = () => {
   }, [isOpen]); // Re-run only when isOpen changes
 
   const handleAddResource = () => {
-    setResources([...resources, { id: Date.now(), item: '', quantity: 1 }]);
+    setResources([...resources, { id: Date.now(), item: '', quantity: 1, unit: 'Buah' }]);
   };
 
   const handleRemoveResource = (id: number) => {
     setResources(resources.filter(r => r.id !== id));
   };
 
-  const handleResourceChange = (id: number, field: 'item' | 'quantity', value: string | number) => {
+  const handleResourceChange = (id: number, field: 'item' | 'quantity' | 'unit', value: string | number) => {
     setResources(resources.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Create new task object
-    const newTask = {
-      id: Date.now().toString(),
+    const taskData = {
+      id: taskToEdit ? taskToEdit.id : Date.now().toString(),
       title,
-      assignee: selectedAssignee ? selectedAssignee.name : 'Unassigned',
-      assigneeAvatar: selectedAssignee ? selectedAssignee.avatar : 'https://picsum.photos/seed/unknown/200',
-      status: TaskStatus.OPEN,
+      description,
+      assignee: selectedAssignee ? selectedAssignee.name : (taskToEdit ? taskToEdit.assignee : 'Unassigned'),
+      assigneeAvatar: selectedAssignee ? selectedAssignee.avatar : (taskToEdit ? taskToEdit.assigneeAvatar : 'https://picsum.photos/seed/unknown/200'),
+      status: status, // Use the status state
       type: taskType,
-      dueDate: dueDate ? new Date(dueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : 'Segera',
+      dueDate: dueDate ? new Date(dueDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : (taskToEdit ? taskToEdit.dueDate : 'Segera'),
       priority,
       incidentId,
-      coordinates: location
+      coordinates: location,
+      resources
     };
 
-    addTask(newTask);
+    if (taskToEdit) {
+        updateTask(taskData);
+    } else {
+        addTask(taskData);
+    }
+    
     closeTaskForm();
   };
 
@@ -211,7 +257,7 @@ const CreateTaskForm: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Buat Tugas Baru</h2>
+            <h2 className="text-xl font-bold text-slate-800">{taskToEdit ? 'Edit Tugas' : 'Buat Tugas Baru'}</h2>
             <p className="text-sm text-slate-500">Isi detail tugas untuk penanganan insiden.</p>
           </div>
           <button 
@@ -281,6 +327,22 @@ const CreateTaskForm: React.FC = () => {
                     </select>
                   </div>
                 </div>
+
+                {/* Status Dropdown - Only visible when Editing */}
+                {taskToEdit && (
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Status Tugas</label>
+                        <select 
+                            value={status}
+                            onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary bg-slate-50"
+                        >
+                            <option value={TaskStatus.OPEN}>Terbuka</option>
+                            <option value={TaskStatus.IN_PROGRESS}>Dalam Proses</option>
+                            <option value={TaskStatus.DONE}>Selesai</option>
+                        </select>
+                    </div>
+                )}
               </div>
             </section>
 
@@ -357,13 +419,13 @@ const CreateTaskForm: React.FC = () => {
                   <label className="mb-1 block text-sm font-medium text-slate-700">Jatuh Tempo <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <input 
-                      required
                       type="datetime-local" 
                       value={dueDate}
                       onChange={(e) => setDueDate(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
+                  <p className="text-[10px] text-slate-400 mt-1">Kosongkan jika ingin menggunakan format teks 'Segera' (hanya saat edit).</p>
                 </div>
               </div>
             </section>
@@ -418,6 +480,15 @@ const CreateTaskForm: React.FC = () => {
                         onChange={(e) => handleResourceChange(res.id, 'quantity', parseInt(e.target.value))}
                         className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       />
+                      <select
+                        value={res.unit}
+                        onChange={(e) => handleResourceChange(res.id, 'unit', e.target.value)}
+                        className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                      >
+                         {unitOptions.map(u => (
+                             <option key={u} value={u}>{u}</option>
+                         ))}
+                      </select>
                       {resources.length > 1 && (
                         <button 
                           type="button" 
@@ -460,7 +531,7 @@ const CreateTaskForm: React.FC = () => {
               className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-white shadow hover:bg-sky-600 hover:shadow-md transition-all"
             >
               <Save size={18} />
-              Buat & Tugaskan
+              {taskToEdit ? 'Simpan Perubahan' : 'Buat & Tugaskan'}
             </button>
           </div>
         </div>

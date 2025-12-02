@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { Filter, ChevronDown, Plus, MoreHorizontal, Clock, ArrowRight, Minus, ChevronUp, Check } from 'lucide-react';
-import { incidents } from '../mockData';
 import { IncidentSeverity, Task } from '../types';
 import { useTaskModal } from '../contexts/TaskModalContext';
 import { useTaskContext } from '../contexts/TaskContext';
+import { useIncidentContext } from '../contexts/IncidentContext';
 
 declare global {
   interface Window {
@@ -13,11 +13,16 @@ declare global {
 }
 
 const Dashboard: React.FC = () => {
-  const [selectedIncident, setSelectedIncident] = React.useState(incidents[0].id);
+  const { incidents } = useIncidentContext();
+  // Default ke 'All' agar menampilkan semua insiden/tugas
+  const [selectedIncident, setSelectedIncident] = React.useState('All');
   const mapContainerRef = React.useRef<HTMLDivElement>(null);
   const mapInstanceRef = React.useRef<any>(null);
-  const markersRef = React.useRef<any[]>([]);
-  const taskMarkersRef = React.useRef<any[]>([]);
+  
+  // Menggunakan Object/Dictionary untuk menyimpan marker agar bisa diakses via ID
+  const markersRef = React.useRef<{[key: string]: any}>({});
+  const taskMarkersRef = React.useRef<{[key: string]: any}>({});
+
   const { openTaskForm } = useTaskModal();
   const { tasks } = useTaskContext();
   const [showAllTasks, setShowAllTasks] = React.useState(false);
@@ -26,14 +31,25 @@ const Dashboard: React.FC = () => {
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [priorityFilter, setPriorityFilter] = React.useState<string>('All');
 
-  // Filter Logic: Apply Priority Filter -> Then split for display
-  const filteredTasksByPriority = React.useMemo(() => {
-    if (priorityFilter === 'All') return tasks;
-    return tasks.filter(t => t.priority === priorityFilter);
-  }, [tasks, priorityFilter]);
+  // Filter Logic: Apply Incident Filter -> Then Priority Filter
+  const filteredTasks = React.useMemo(() => {
+    let result = tasks;
+
+    // 1. Filter by Selected Incident (jika bukan 'All')
+    if (selectedIncident !== 'All') {
+      result = result.filter(t => t.incidentId === selectedIncident);
+    }
+
+    // 2. Filter by Priority
+    if (priorityFilter !== 'All') {
+      result = result.filter(t => t.priority === priorityFilter);
+    }
+
+    return result;
+  }, [tasks, selectedIncident, priorityFilter]);
 
   // For Sidebar: Filter that are active (not 'Selesai') based on the Priority Filter result
-  const activeTasks = filteredTasksByPriority.filter(t => t.status !== 'Selesai');
+  const activeTasks = filteredTasks.filter(t => t.status !== 'Selesai');
   
   // Tasks to display in sidebar based on expand state
   const displayedTasks = showAllTasks ? activeTasks : activeTasks.slice(0, 3);
@@ -44,10 +60,14 @@ const Dashboard: React.FC = () => {
 
     if (!mapInstanceRef.current) {
       // Create map instance
+      // Use the selected incident coordinates if available, otherwise default to first incident or fallback
+      const initialLat = incidents[0]?.coordinates.lat || -6.2088;
+      const initialLng = incidents[0]?.coordinates.lng || 106.8456;
+
       const map = window.L.map(mapContainerRef.current, {
         zoomControl: false, 
         attributionControl: false
-      }).setView([incidents[0].coordinates.lat, incidents[0].coordinates.lng], 12);
+      }).setView([initialLat, initialLng], 12);
 
       // Add OpenStreetMap tile layer
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -58,37 +78,47 @@ const Dashboard: React.FC = () => {
       mapInstanceRef.current = map;
     }
 
-    // Update markers initially
-    updateMarkers();
-
     // Clean up on unmount
     return () => {
+      // We don't necessarily want to destroy the map on re-renders, 
+      // but strict React mode might trigger double init. The check above handles it.
     };
-  }, []);
+  }, []); // Run once on mount to setup map instance
 
-  // Effect to update task markers whenever tasks OR filter changes
+  // Effect to update INCIDENT markers whenever incidents data changes
+  React.useEffect(() => {
+    if (mapInstanceRef.current && window.L && incidents.length > 0) {
+        updateMarkers();
+    }
+  }, [incidents, selectedIncident]); // Re-run if incident selection changes to update visibility/focus if needed
+
+  // Effect to update TASK markers whenever tasks OR filter changes
   React.useEffect(() => {
     if (mapInstanceRef.current && window.L) {
-      updateTaskMarkers(filteredTasksByPriority);
+      updateTaskMarkers(filteredTasks);
     }
-  }, [tasks, priorityFilter]);
+  }, [tasks, selectedIncident, priorityFilter]);
 
   // Handle Incident Markers
   const updateMarkers = () => {
     if (!mapInstanceRef.current || !window.L) return;
 
     // Clear existing incident markers
-    markersRef.current.forEach(marker => marker.remove());
-    markersRef.current = [];
+    Object.values(markersRef.current).forEach((marker: any) => marker.remove());
+    markersRef.current = {};
 
     incidents.forEach(incident => {
+      // Determine color based on severity
       const color = incident.severity === IncidentSeverity.CRITICAL ? '#ef4444' : 
-                    incident.severity === IncidentSeverity.HIGH ? '#f97316' : '#14b8a6';
+                    incident.severity === IncidentSeverity.HIGH ? '#f97316' : 
+                    incident.severity === IncidentSeverity.MEDIUM ? '#eab308' : '#14b8a6';
       
+      // Triangle shape with exclamation mark
       const svgIcon = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 drop-shadow-md">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-          <circle cx="12" cy="10" r="3" fill="white"></circle>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-10 h-10 drop-shadow-md">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="${color}" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="9" x2="12" y2="13" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <line x1="12" y1="17" x2="12.01" y2="17" stroke="white" stroke-width="3" stroke-linecap="round"/>
         </svg>
       `;
 
@@ -96,11 +126,14 @@ const Dashboard: React.FC = () => {
         className: 'custom-div-icon',
         html: svgIcon,
         iconSize: [40, 40],
-        iconAnchor: [20, 40],
-        popupAnchor: [0, -40]
+        iconAnchor: [20, 20], // Centered because it's a warning sign shape
+        popupAnchor: [0, -20]
       });
 
-      const marker = window.L.marker([incident.coordinates.lat, incident.coordinates.lng], { icon })
+      const marker = window.L.marker([incident.coordinates.lat, incident.coordinates.lng], { 
+        icon,
+        zIndexOffset: 10000 // Highest priority z-index to stay on top
+      })
         .addTo(mapInstanceRef.current)
         .bindPopup(`
           <div class="p-1">
@@ -113,11 +146,9 @@ const Dashboard: React.FC = () => {
         setSelectedIncident(incident.id);
       });
 
-      markersRef.current.push(marker);
+      // Simpan marker dengan key ID insiden
+      markersRef.current[incident.id] = marker;
     });
-    
-    // Initial load uses all tasks (or filtered if state set)
-    updateTaskMarkers(filteredTasksByPriority);
   };
 
   // Handle Task Markers
@@ -125,8 +156,8 @@ const Dashboard: React.FC = () => {
     if (!mapInstanceRef.current || !window.L) return;
 
     // Clear existing task markers
-    taskMarkersRef.current.forEach(marker => marker.remove());
-    taskMarkersRef.current = [];
+    Object.values(taskMarkersRef.current).forEach((marker: any) => marker.remove());
+    taskMarkersRef.current = {};
 
     tasksToRender.forEach(task => {
         if (!task.coordinates) return;
@@ -134,6 +165,9 @@ const Dashboard: React.FC = () => {
         // Color based on Priority
         const color = task.priority === 'High' ? '#ef4444' : 
                       task.priority === 'Medium' ? '#f97316' : '#14b8a6';
+
+        const priorityTextClass = task.priority === 'High' ? 'text-red-600' : 
+                                  task.priority === 'Medium' ? 'text-orange-600' : 'text-teal-600';
 
         const svgIcon = `
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" stroke="#ffffff" stroke-width="2" class="w-4 h-4 drop-shadow-sm">
@@ -149,42 +183,87 @@ const Dashboard: React.FC = () => {
             popupAnchor: [0, -8]
         });
 
-        const marker = window.L.marker([task.coordinates.lat, task.coordinates.lng], { icon })
+        // Determine what to show in the description area (Resource or Description)
+        const detailText = task.resources && task.resources.length > 0
+            ? `${task.resources[0].item} ${task.resources[0].quantity} ${task.resources[0].unit}`
+            : (task.description ? (task.description.length > 30 ? task.description.substring(0, 30) + '...' : task.description) : 'Tidak ada detail');
+
+        const marker = window.L.marker([task.coordinates.lat, task.coordinates.lng], { 
+            icon,
+            zIndexOffset: 500 // Lower priority z-index
+        })
             .addTo(mapInstanceRef.current)
             .bindPopup(`
-                <div class="p-1 min-w-[150px]">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">${task.type}</span>
-                        <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                            task.priority === 'High' ? 'bg-red-100 text-red-600' : 
-                            task.priority === 'Medium' ? 'bg-orange-100 text-orange-600' : 'bg-teal-100 text-teal-600'
-                        }">${task.priority}</span>
+                <div class="font-sans min-w-[200px] p-0.5">
+                    <h3 class="text-sm font-bold text-slate-900 leading-tight mb-1">${task.title}</h3>
+                    <p class="text-xs text-slate-500 mb-3">${detailText}</p>
+                    
+                    <div class="border-t border-slate-100 my-2"></div>
+                    
+                    <div class="flex justify-between items-center text-xs mb-1">
+                        <span class="text-slate-400">Petugas:</span>
+                        <span class="font-semibold text-slate-700 max-w-[100px] truncate text-right">${task.assignee}</span>
                     </div>
-                    <h4 class="font-bold text-sm text-slate-800 leading-tight my-1">${task.title}</h4>
-                    <div class="flex items-center gap-2 mt-2">
-                        <img src="${task.assigneeAvatar}" class="w-5 h-5 rounded-full object-cover" />
-                        <span class="text-xs text-slate-600">${task.assignee}</span>
+                    <div class="flex justify-between items-center text-xs mb-2">
+                         <span class="text-slate-400">Deadline:</span>
+                         <span class="font-semibold text-red-500 text-right">${task.dueDate}</span>
+                    </div>
+
+                    <div class="text-xs font-bold ${priorityTextClass}">
+                        Prioritas: ${task.priority}
                     </div>
                 </div>
             `);
         
-        taskMarkersRef.current.push(marker);
+        // Simpan marker dengan key ID tugas
+        taskMarkersRef.current[task.id] = marker;
     });
+  };
+
+  // Logic: When Task Card is Clicked -> Fly to location AND Open Popup
+  const handleTaskClick = (task: Task) => {
+    if (mapInstanceRef.current && window.L && task.coordinates) {
+      // 1. Fly to location
+      mapInstanceRef.current.flyTo(
+        [task.coordinates.lat, task.coordinates.lng], 
+        16, 
+        { duration: 1.2 }
+      );
+
+      // 2. Open the specific popup using ID lookup
+      const marker = taskMarkersRef.current[task.id];
+      if (marker) {
+        // Delay slightly to wait for fly animation start
+        setTimeout(() => marker.openPopup(), 500);
+      }
+    }
   };
 
   // React to selected incident change
   React.useEffect(() => {
-    if (mapInstanceRef.current && window.L) {
-      const incident = incidents.find(i => i.id === selectedIncident);
-      if (incident) {
-        mapInstanceRef.current.flyTo(
-          [incident.coordinates.lat, incident.coordinates.lng], 
-          13, 
-          { duration: 1.5 }
-        );
+    if (mapInstanceRef.current && window.L && incidents.length > 0) {
+      if (selectedIncident !== 'All') {
+          const incident = incidents.find(i => i.id === selectedIncident);
+          if (incident) {
+            mapInstanceRef.current.flyTo(
+              [incident.coordinates.lat, incident.coordinates.lng], 
+              13, 
+              { duration: 1.5 }
+            );
+            
+            // Open incident popup
+            const marker = markersRef.current[incident.id];
+            if (marker) {
+                setTimeout(() => marker.openPopup(), 500);
+            }
+          }
+      } else {
+         // Optional: Zoom out to see all incidents if 'All' is selected
+         // Calculating bounds would be ideal, for now just reset to a wider view
+         // mapInstanceRef.current.setView([-6.2088, 106.8456], 5);
       }
     }
-  }, [selectedIncident]);
+  }, [selectedIncident, incidents]); // Include incidents in dependency
 
   const handleZoomIn = () => {
     if (mapInstanceRef.current) {
@@ -212,6 +291,7 @@ const Dashboard: React.FC = () => {
                 onChange={(e) => setSelectedIncident(e.target.value)}
                 className="w-full min-w-[240px] appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-medium shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               >
+                <option value="All">Semua Insiden</option>
                 {incidents.map(inc => (
                   <option key={inc.id} value={inc.id}>{inc.name}</option>
                 ))}
@@ -304,7 +384,11 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full bg-orange-500 border border-white shadow-sm"></span>
-                Prioritas Menengah
+                Prioritas Tinggi (Insiden)
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-yellow-500 border border-white shadow-sm"></span>
+                Prioritas Sedang (Insiden)
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full bg-teal-500 border border-white shadow-sm"></span>
@@ -335,7 +419,11 @@ const Dashboard: React.FC = () => {
         {/* Task Cards */}
         <div className="flex flex-col gap-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
           {displayedTasks.length > 0 ? displayedTasks.map(task => (
-            <div key={task.id} className="group relative flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-primary/50 hover:shadow-md animate-in fade-in slide-in-from-right-4 duration-300">
+            <div 
+                key={task.id} 
+                onClick={() => handleTaskClick(task)}
+                className="group relative flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-primary/50 hover:shadow-md animate-in fade-in slide-in-from-right-4 duration-300 cursor-pointer"
+            >
               <div className="flex justify-between items-start">
                 <h3 className="font-semibold text-slate-800 line-clamp-2 text-sm">{task.title}</h3>
                 <span className={`h-2 w-2 rounded-full ${task.priority === 'High' ? 'bg-red-500' : task.priority === 'Medium' ? 'bg-orange-500' : 'bg-teal-500'}`}></span>

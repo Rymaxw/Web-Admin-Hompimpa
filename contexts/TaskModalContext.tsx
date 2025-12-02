@@ -1,9 +1,12 @@
 
 import React, { createContext, useState, useContext, ReactNode } from 'react';
+import { Task } from '../types';
 
 interface TaskModalContextType {
   isOpen: boolean;
+  taskToEdit: Task | null;
   openTaskForm: () => void;
+  openEditTaskForm: (task: Task) => void;
   closeTaskForm: () => void;
 }
 
@@ -11,12 +14,26 @@ const TaskModalContext = createContext<TaskModalContextType | undefined>(undefin
 
 export const TaskModalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
 
-  const openTaskForm = () => setIsOpen(true);
-  const closeTaskForm = () => setIsOpen(false);
+  const openTaskForm = () => {
+    setTaskToEdit(null);
+    setIsOpen(true);
+  };
+
+  const openEditTaskForm = (task: Task) => {
+    setTaskToEdit(task);
+    setIsOpen(true);
+  };
+
+  const closeTaskForm = () => {
+    setIsOpen(false);
+    // Delay clearing taskToEdit to avoid UI flickering during closing transition
+    setTimeout(() => setTaskToEdit(null), 300);
+  };
 
   return (
-    <TaskModalContext.Provider value={{ isOpen, openTaskForm, closeTaskForm }}>
+    <TaskModalContext.Provider value={{ isOpen, taskToEdit, openTaskForm, openEditTaskForm, closeTaskForm }}>
       {children}
     </TaskModalContext.Provider>
   );

@@ -27,9 +27,13 @@ const Settings: React.FC = () => {
                  <label className="text-sm font-medium text-slate-700">Nama Belakang</label>
                  <input type="text" defaultValue="Hompimpa" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
                </div>
-               <div className="space-y-2 md:col-span-2">
+               <div className="space-y-2">
                  <label className="text-sm font-medium text-slate-700">Email</label>
                  <input type="email" defaultValue="admin@hompimpa.id" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-sm font-medium text-slate-700">Nomor Telepon</label>
+                 <input type="tel" defaultValue="+62 812-3456-7890" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
                </div>
             </div>
           </div>

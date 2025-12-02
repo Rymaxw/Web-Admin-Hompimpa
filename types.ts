@@ -37,9 +37,17 @@ export enum TaskType {
   RESCUE = 'Penyelamatan',
 }
 
+export interface TaskResource {
+    id: number;
+    item: string;
+    quantity: number;
+    unit: string;
+}
+
 export interface Task {
   id: string;
   title: string;
+  description?: string;
   assignee: string;
   assigneeAvatar: string;
   status: TaskStatus;
@@ -51,6 +59,7 @@ export interface Task {
     lat: number;
     lng: number;
   };
+  resources?: TaskResource[];
 }
 
 export interface Volunteer {
@@ -60,4 +69,7 @@ export interface Volunteer {
   avatar: string;
   status: 'Tersedia' | 'Ditugaskan' | 'Istirahat';
   skills: string[];
+  email?: string;
+  phone?: string;
+  location: string; // New field for grouping
 }
