@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, ArrowUpDown, Eye, Edit2, Plus, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { Incident, IncidentSeverity, IncidentStatus } from '../types';
 import { useIncidentContext } from '../contexts/IncidentContext';
@@ -10,7 +11,8 @@ const Incidents: React.FC = () => {
   const { incidents } = useIncidentContext();
   
   // States for UI Logic
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const searchTerm = searchParams.get('q') || '';
   const [severityFilter, setSeverityFilter] = useState<string>('All');
   const [sortOption, setSortOption] = useState<string>('DateDesc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -92,16 +94,7 @@ const Incidents: React.FC = () => {
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 rounded-xl bg-white p-2 shadow-sm border border-slate-100 z-10">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Cari insiden berdasarkan nama atau lokasi..." 
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full rounded-lg bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
+
         <div className="flex gap-2 relative">
            
            {/* Filter Dropdown */}

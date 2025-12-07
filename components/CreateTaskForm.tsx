@@ -4,7 +4,8 @@ import { X, MapPin, Search, Plus, Trash2, Save } from 'lucide-react';
 import { useTaskModal } from '../contexts/TaskModalContext';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useIncidentContext } from '../contexts/IncidentContext';
-import { volunteers } from '../mockData';
+import { useVolunteerContext } from '../contexts/VolunteerContext';
+import { volunteers as mockVolunteers } from '../mockData';
 import { TaskStatus, TaskType } from '../types';
 
 declare global {
@@ -17,6 +18,7 @@ const CreateTaskForm: React.FC = () => {
   const { isOpen, closeTaskForm, taskToEdit } = useTaskModal();
   const { addTask, updateTask } = useTaskContext();
   const { incidents } = useIncidentContext();
+  const { volunteers, updateVolunteer } = useVolunteerContext();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
@@ -231,6 +233,20 @@ const CreateTaskForm: React.FC = () => {
         updateTask(taskData);
     } else {
         addTask(taskData);
+    }
+
+    // Update Volunteer Status
+    // If task is DONE -> Tersedia
+    // If task is OPEN/IN_PROGRESS -> Ditugaskan (ensure they are marked busy)
+    if (selectedAssignee && 'id' in selectedAssignee) {
+        const volunteerToUpdate = volunteers.find(v => v.id === selectedAssignee.id);
+        if (volunteerToUpdate) {
+            const newStatus = status === TaskStatus.DONE ? 'Tersedia' : 'Ditugaskan';
+            // Only update if status is different to avoid unnecessary re-renders/saves
+            if (volunteerToUpdate.status !== newStatus) {
+                updateVolunteer({ ...volunteerToUpdate, status: newStatus });
+            }
+        }
     }
     
     closeTaskForm();

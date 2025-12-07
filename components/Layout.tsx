@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Home, 
   AlertTriangle, 
@@ -18,6 +18,8 @@ import CreateTaskForm from './CreateTaskForm';
 const Layout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const navItems = [
     { name: 'Beranda', path: '/', icon: Home },
@@ -72,6 +74,15 @@ const Layout: React.FC = () => {
             <input
               type="text"
               placeholder="Cari..."
+              value={searchParams.get('q') || ''}
+              onChange={(e) => {
+                const term = e.target.value;
+                if (term) {
+                  setSearchParams({ q: term });
+                } else {
+                  setSearchParams({});
+                }
+              }}
               className="w-full rounded-full border border-slate-200 bg-slate-100 py-2 pl-10 pr-4 text-sm focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -86,7 +97,8 @@ const Layout: React.FC = () => {
           <img
             src="https://picsum.photos/seed/admin/100"
             alt="User"
-            className="h-9 w-9 cursor-pointer rounded-full border border-slate-200 object-cover"
+            onClick={() => navigate('/settings')}
+            className="h-9 w-9 cursor-pointer rounded-full border border-slate-200 object-cover hover:ring-2 hover:ring-primary hover:ring-offset-2 transition-all"
           />
 
           {/* Mobile Menu Button */}

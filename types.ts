@@ -73,3 +73,13 @@ export interface Volunteer {
   phone?: string;
   location: string; // New field for grouping
 }
+
+export interface UserProfile {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  organization: string;
+  timezone: string;
+  avatar: string;
+}

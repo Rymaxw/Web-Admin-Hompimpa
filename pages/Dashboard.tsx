@@ -12,8 +12,14 @@ declare global {
   }
 }
 
+import { useNavigate } from 'react-router-dom';
+import { useVolunteerContext } from '../contexts/VolunteerContext';
+
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { incidents } = useIncidentContext();
+  const { volunteers } = useVolunteerContext();
+  
   // Default ke 'All' agar menampilkan semua insiden/tugas
   const [selectedIncident, setSelectedIncident] = React.useState('All');
   const mapContainerRef = React.useRef<HTMLDivElement>(null);
@@ -31,6 +37,9 @@ const Dashboard: React.FC = () => {
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [priorityFilter, setPriorityFilter] = React.useState<string>('All');
 
+  // Volunteer Menu State
+  const [isVolMenuOpen, setIsVolMenuOpen] = React.useState(false);
+
   // Filter Logic: Apply Incident Filter -> Then Priority Filter
   const filteredTasks = React.useMemo(() => {
     let result = tasks;
@@ -47,6 +56,25 @@ const Dashboard: React.FC = () => {
 
     return result;
   }, [tasks, selectedIncident, priorityFilter]);
+
+  // Calculate Volunteer Stats
+  const volunteerStats = React.useMemo(() => {
+    let filteredVolunteers = volunteers;
+
+    if (selectedIncident !== 'All') {
+      const incident = incidents.find(i => i.id === selectedIncident);
+      if (incident) {
+        // Filter volunteers by matching location string
+        // Note: This is a simple string match, might need refinement for real app
+        filteredVolunteers = volunteers.filter(v => v.location === incident.location);
+      }
+    }
+
+    return {
+      active: filteredVolunteers.filter(v => v.status === 'Ditugaskan').length,
+      standby: filteredVolunteers.filter(v => v.status === 'Tersedia').length
+    };
+  }, [volunteers, selectedIncident, incidents]);
 
   // For Sidebar: Filter that are active (not 'Selesai') based on the Priority Filter result
   const activeTasks = filteredTasks.filter(t => t.status !== 'Selesai');
@@ -467,18 +495,54 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Quick Stats or Updates */}
-        <div className="rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 p-5 text-white shadow-lg mt-auto">
+        <div className="rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 p-5 text-white shadow-lg mt-auto relative">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-bold">Status Relawan</h3>
-            <MoreHorizontal size={20} className="text-slate-400" />
+            <div className="relative">
+              <button 
+                onClick={() => setIsVolMenuOpen(!isVolMenuOpen)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <MoreHorizontal size={20} />
+              </button>
+              
+              {isVolMenuOpen && (
+                <div className="absolute right-0 bottom-full mb-2 w-48 rounded-xl border border-slate-200 bg-white shadow-lg z-50 overflow-hidden">
+                  <div className="p-1">
+                    <button 
+                      onClick={() => { 
+                        let state = {};
+                        if (selectedIncident !== 'All') {
+                            const incident = incidents.find(i => i.id === selectedIncident);
+                            if (incident) {
+                                state = { location: incident.location };
+                            }
+                        }
+                        navigate('/volunteers', { state }); 
+                        setIsVolMenuOpen(false); 
+                      }}
+                      className="flex w-full items-center text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      Lihat Semua Relawan
+                    </button>
+                    <button 
+                      onClick={() => { alert('Laporan sedang diunduh...'); setIsVolMenuOpen(false); }}
+                      className="flex w-full items-center text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      Unduh Laporan
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
              <div className="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
-                <p className="text-2xl font-bold text-teal-400">24</p>
+                <p className="text-2xl font-bold text-teal-400">{volunteerStats.active}</p>
                 <p className="text-xs text-slate-300">Aktif di Lapangan</p>
              </div>
              <div className="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
-                <p className="text-2xl font-bold text-orange-400">8</p>
+                <p className="text-2xl font-bold text-orange-400">{volunteerStats.standby}</p>
                 <p className="text-xs text-slate-300">Siaga</p>
              </div>
           </div>

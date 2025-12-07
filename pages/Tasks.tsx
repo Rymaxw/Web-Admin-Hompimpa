@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, MoreHorizontal, Clock, CheckCircle2, ChevronLeft, LayoutGrid, List, Filter, Check, ArrowRight, AlertTriangle, Eye, Edit2 } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useIncidentContext } from '../contexts/IncidentContext';
@@ -11,6 +12,8 @@ const Tasks: React.FC = () => {
   const { openTaskForm, openEditTaskForm } = useTaskModal();
   const { tasks } = useTaskContext();
   const { incidents } = useIncidentContext();
+  const [searchParams] = useSearchParams();
+  const searchTerm = searchParams.get('q') || '';
   
   // State for Master-Detail View
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
@@ -41,6 +44,13 @@ const Tasks: React.FC = () => {
   const incidentTasks = useMemo(() => {
     if (!selectedIncidentId) return [];
     let filtered = tasks.filter(t => t.incidentId === selectedIncidentId);
+    
+    if (searchTerm) {
+        filtered = filtered.filter(t => 
+            t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.assignee.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }
     
     if (priorityFilter !== 'All') {
       filtered = filtered.filter(t => t.priority === priorityFilter);
@@ -139,7 +149,7 @@ const Tasks: React.FC = () => {
                         {isFilterOpen && (
                             <div className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-slate-200 bg-white shadow-lg z-20 overflow-hidden">
                                 <button onClick={() => { setPriorityFilter('All'); setIsFilterOpen(false); }} className="flex w-full items-center justify-between px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">Semua {priorityFilter === 'All' && <Check size={14} className="text-primary"/>}</button>
-                                <button onClick={() => { setPriorityFilter('High'); setIsFilterOpen(false); }} className="flex w-full items-center justify-between px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">Tinggi {priorityFilter === 'High' && <Check size={14} className="text-primary"/>}</button>
+                                <button onClick={() => { setPriorityFilter('High'); setIsFilterOpen(false); }} className="flex w-full items-center justify-between px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">Tinggi/Kritis {priorityFilter === 'High' && <Check size={14} className="text-primary"/>}</button>
                                 <button onClick={() => { setPriorityFilter('Medium'); setIsFilterOpen(false); }} className="flex w-full items-center justify-between px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">Sedang {priorityFilter === 'Medium' && <Check size={14} className="text-primary"/>}</button>
                                 <button onClick={() => { setPriorityFilter('Low'); setIsFilterOpen(false); }} className="flex w-full items-center justify-between px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">Rendah {priorityFilter === 'Low' && <Check size={14} className="text-primary"/>}</button>
                             </div>
@@ -185,7 +195,7 @@ const Tasks: React.FC = () => {
                                                 task.priority === 'Medium' ? 'bg-orange-50 text-orange-600' :
                                                 'bg-teal-50 text-teal-600'
                                             }`}>
-                                                {task.priority}
+                                                {task.priority === 'High' ? 'Tinggi/Kritis' : task.priority === 'Medium' ? 'Sedang' : 'Rendah'}
                                             </span>
                                             
                                             {/* Three Dots Button */}

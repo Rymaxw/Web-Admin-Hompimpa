@@ -1,7 +1,6 @@
-
-import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { Task } from '../types';
-import { tasks as initialTasks } from '../mockData';
+import React, { createContext, useState, useContext, ReactNode } from "react";
+import { Task } from "../types";
+import { tasks as initialTasks } from "../mockData";
 
 interface TaskContextType {
   tasks: Task[];
@@ -12,15 +11,26 @@ interface TaskContextType {
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
-export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+export const TaskProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const savedTasks = localStorage.getItem("tasks");
+    return savedTasks ? JSON.parse(savedTasks) : initialTasks;
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem("tasks", JSON.stringify(tasks));
+  }, [tasks]);
 
   const addTask = (task: Task) => {
     setTasks((prev) => [task, ...prev]);
   };
 
   const updateTask = (updatedTask: Task) => {
-    setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+    setTasks((prev) =>
+      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
+    );
   };
 
   const deleteTask = (taskId: string) => {
@@ -37,7 +47,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 export const useTaskContext = () => {
   const context = useContext(TaskContext);
   if (!context) {
-    throw new Error('useTaskContext must be used within a TaskProvider');
+    throw new Error("useTaskContext must be used within a TaskProvider");
   }
   return context;
 };

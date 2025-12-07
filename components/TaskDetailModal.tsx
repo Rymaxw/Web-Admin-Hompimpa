@@ -76,7 +76,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                         task.priority === 'Medium' ? 'bg-orange-100 text-orange-700' : 
                         'bg-teal-100 text-teal-700'
                     }`}>
-                        {task.priority} Priority
+                        {task.priority === 'High' ? 'Tinggi/Kritis' : task.priority === 'Medium' ? 'Sedang' : 'Rendah'}
                     </span>
                     <span className={`px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
                         task.status === 'Selesai' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
